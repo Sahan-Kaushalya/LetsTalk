@@ -22,7 +22,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; userId: nu
         if (userId === 0 || (socketRef.current && socketRef.current.readyState === WebSocket.OPEN)) {
             return;
         }
-        const socket = new WebSocket(`wss://${process.env.EXPO_PUBLIC_WS_URL}/ChatApp/chat?userId=${userId}`); //wss=> https
+        const socket = new WebSocket(`wss://${process.env.EXPO_PUBLIC_WS_URL}/LetsTalk/chat?userId=${userId}`); //wss=> https
 
         socketRef.current = socket;
 

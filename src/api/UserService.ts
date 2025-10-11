@@ -32,22 +32,42 @@ export const createNewAccount = async (
   }
 };
 
-export const uploadProfileImage = async (userId:string, imageUri: string) => {
+export const updateProfile = async (
+  userId: string,
+  firstName: string,
+  lastName: string,
+  aboutMe: string,
+  imageUri: string
+) => {
   let formData = new FormData();
+  
   formData.append("userId", userId);
-  formData.append("profileImage", {
-    uri: imageUri,
-    type: "image/png", // change if PNG
-    name: "profile.png",
-  } as any);
+  formData.append("firstName", firstName);
+  formData.append("lastName", lastName);
+  formData.append("aboutMe", aboutMe);
+    formData.append("profileImage", {
+      uri: imageUri,
+      type: "image/jpeg", 
+      name: "profile.jpg",
+    } as any);
+  
 
-  const response = await fetch(API + "/ProfileController", {
-    method: "POST",
-    body: formData,
-  });
-  if (response.ok) {
-    return await response.json();
-  } else {
-    console.warn("Profile image uploading failed!");
+  try {
+    const response = await fetch(API + "/ProfileUpdateController", {
+      method: "POST",
+      body: formData,
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    } else {
+      const errorText = await response.text();
+      console.warn("Profile Updating failed!", errorText);
+      throw new Error("Profile update failed");
+    }
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    throw error;
   }
 };

@@ -8,16 +8,26 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MessageBubbleShape from "../components/MessageBubbleShape";
 import { RootStackParamList } from "../../App";
 import { useTheme } from "../theme/ThemeProvider";
+import { useWebSocketPing } from "../hook/UseWebSocketPing";
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'SplashScreen'>;
 
 export default function SplashScreen() {
+    useWebSocketPing(180000);
     const navigation = useNavigation<NavigationProps>();
     const opacity = useSharedValue(0);
 
     useEffect(() => {
         opacity.value = withTiming(1, { duration: 3500 });
-    }, [opacity]);
+
+        const timeout = setTimeout(() => {
+            navigation.navigate('HomeScreen');
+        }, 4000);
+        return () => {
+            clearTimeout(timeout);
+        }
+
+    }, [navigation, opacity]);
 
     const animatedStyle = useAnimatedStyle(() => {
         return {

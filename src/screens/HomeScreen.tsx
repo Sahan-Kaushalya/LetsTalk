@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, Image, StatusBar, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, Image, StatusBar, TextInput, ActivityIndicator, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
 import { useUserRegistration } from "../components/UserContext";
@@ -7,84 +7,15 @@ import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../App";
 import { useNavigation } from "@react-navigation/native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { ChatItem } from "../interface/LetsTalkChats";
+import { useChatList } from "../hook/UseChatList";
+import { formatChatTime } from "../util/DateFormatter";
+import { ALERT_TYPE, Dialog } from "react-native-alert-notification";
+import { AuthContext } from "../components/AuthProvider";
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'HomeScreen'>;
 
-interface ChatItem {
-    id: string;
-    name: string;
-    lastMessage: string;
-    timestamp: string;
-    unreadCount: number;
-    avatar: string;
-    isOnline: boolean;
-    messageType: 'text' | 'image' | 'voice' | 'video';
-}
-
-// Mock data - Replace with your actual API
-const MOCK_CHATS: ChatItem[] = [
-    {
-        id: '1',
-        name: 'Kasun Perera',
-        lastMessage: 'See you tomorrow! 👋',
-        timestamp: '2m ago',
-        unreadCount: 2,
-        avatar: 'https://i.pravatar.cc/150?img=1',
-        isOnline: true,
-        messageType: 'text',
-    },
-    {
-        id: '2',
-        name: 'Nimali Fernando',
-        lastMessage: 'Thanks for the help!',
-        timestamp: '15m ago',
-        unreadCount: 0,
-        avatar: 'https://i.pravatar.cc/150?img=5',
-        isOnline: true,
-        messageType: 'text',
-    },
-    {
-        id: '3',
-        name: 'Ravindu Silva',
-        lastMessage: '📷 Photo',
-        timestamp: '1h ago',
-        unreadCount: 5,
-        avatar: 'https://i.pravatar.cc/150?img=8',
-        isOnline: false,
-        messageType: 'image',
-    },
-    {
-        id: '4',
-        name: 'Tharushi Jayasinghe',
-        lastMessage: '🎤 Voice message',
-        timestamp: '3h ago',
-        unreadCount: 1,
-        avatar: 'https://i.pravatar.cc/150?img=9',
-        isOnline: false,
-        messageType: 'voice',
-    },
-    {
-        id: '5',
-        name: 'Chaminda Weerasinghe',
-        lastMessage: 'Meeting at 3 PM? nuiheuiwhio huehwuihui yguyweugtuewygewhibn buysghb bvuwbjhbugyf gyugwuuyj hweiu',
-        timestamp: 'Yesterday',
-        unreadCount: 0,
-        avatar: 'https://i.pravatar.cc/150?img=12',
-        isOnline: false,
-        messageType: 'text',
-    },
-    {
-        id: '6',
-        name: 'Sanduni Rajapaksha',
-        lastMessage: '📹 Video call',
-        timestamp: 'Yesterday',
-        unreadCount: 0,
-        avatar: 'https://i.pravatar.cc/150?img=20',
-        isOnline: true,
-        messageType: 'video',
-    },
-];
 
 export default function HomeScreen() {
     const { applied } = useTheme();
@@ -97,15 +28,51 @@ export default function HomeScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
+    const [showMenu, setShowMenu] = useState(false);
+    const chatList = useChatList();
+    const auth = useContext(AuthContext);
+
+    const handleLogout = () => {
+        Dialog.show({
+            type: ALERT_TYPE.WARNING,
+            title: 'Logout',
+            textBody: 'Are you sure you want to logout?',
+            button: 'Cancel',
+            autoClose: false,
+            onPressButton: () => {
+                Dialog.hide();
+            },
+        });
+
+        setTimeout(() => {
+            Dialog.show({
+                type: ALERT_TYPE.DANGER,
+                title: 'Confirm Logout',
+                textBody: 'Please confirm to logout.',
+                button: 'Logout',
+                onPressButton: async () => {
+                    Dialog.hide();
+                    await auth?.signOut();
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'WelcomeScreen' }],
+                    });
+                },
+            });
+        }, 100);
+    };
 
     useEffect(() => {
-        // Simulate API call
         setTimeout(() => {
-            setChats(MOCK_CHATS);
-            setFilteredChats(MOCK_CHATS);
+
+            const sortedChats = [...chatList].sort((a, b) =>
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
+            setChats(sortedChats);
+            setFilteredChats(sortedChats);
             setIsLoading(false);
-        }, 1000);
-    }, []);
+        }, 2000);
+    }, [chatList, navigation]);
 
     useEffect(() => {
         filterChats();
@@ -114,93 +81,128 @@ export default function HomeScreen() {
     const filterChats = () => {
         let filtered = chats;
 
-        // Filter by search query
         if (searchQuery.trim()) {
             filtered = filtered.filter(chat =>
-                chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                chat.friendName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
-        // Filter by unread
         if (activeTab === 'unread') {
             filtered = filtered.filter(chat => chat.unreadCount > 0);
         }
 
+        filtered = filtered.sort((a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
         setFilteredChats(filtered);
     };
 
-    const getMessageIcon = (type: ChatItem['messageType']) => {
+    const getMessageIcon = (type: string) => {
         switch (type) {
-            case 'image':
+            case 'IMAGE':
                 return <Ionicons name="image" size={14} color={isDark ? "#94a3b8" : "#64748b"} />;
-            case 'voice':
+            case 'VOICE':
                 return <Ionicons name="mic" size={14} color={isDark ? "#94a3b8" : "#64748b"} />;
-            case 'video':
+            case 'VIDEO':
                 return <Ionicons name="videocam" size={14} color={isDark ? "#94a3b8" : "#64748b"} />;
             default:
                 return null;
         }
     };
 
-    const renderChatItem = ({ item }: { item: ChatItem }) => (
-        <TouchableOpacity
-            onPress={() => {
-                // Navigate to chat screen
-                // navigation.navigate("ChatScreen", { chatId: item.id, name: item.name });
-            }}
-            className="flex-row items-center px-4 py-3 bg-white border-b dark:bg-slate-900 border-sky-100 dark:border-slate-800"
-        >
-            {/* Avatar */}
-            <View className="relative mr-3">
-                <Image
-                    source={{ uri: item.avatar }}
-                    className="w-16 h-16 rounded-full"
-                />
-                {item.isOnline && (
-                    <View className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full dark:border-slate-900" />
-                )}
-            </View>
+    // Get message status icon - only show if unreadCount is 0 (meaning user sent the last message)
+    const getMessageStatusIcon = (status: string, unreadCount: number) => {
+        // Only show status if there are no unread messages (meaning user sent the last message)
+        if (unreadCount > 0) return null;
+        if (!status) return null;
 
-            {/* Chat Info */}
-            <View className="flex-1 mr-2">
-                <View className="flex-row items-center justify-between mb-1">
-                    <Text
-                        className="text-lg font-semibold text-sky-900 dark:text-slate-200"
-                        numberOfLines={1}
-                    >
-                        {item.name}
-                    </Text>
-                    <Text className="text-xs text-sky-600 dark:text-slate-500">
-                        {item.timestamp}
-                    </Text>
+        switch (status) {
+            case 'SENT':
+                return <Ionicons name="checkmark" size={16} color={isDark ? "#94a3b8" : "#64748b"} style={{ marginLeft: 4 }} />;
+            case 'DELIVERED':
+                return <Ionicons name="checkmark-done" size={16} color={isDark ? "#94a3b8" : "#64748b"} style={{ marginLeft: 4 }} />;
+            case 'READ':
+                return <Ionicons name="checkmark-done" size={16} color="#0ea5e9" style={{ marginLeft: 4 }} />;
+            default:
+                return null;
+        }
+    };
+
+    const renderChatItem = ({ item }: { item: ChatItem }) => {
+        // Use default image if profileImage is null, undefined, or empty
+        const profileImageUri = item.profileImage && item.profileImage.trim() !== ''
+            ? item.profileImage
+            : process.env.EXPO_PUBLIC_DEFAULT_PROFILE_IMAGE;
+
+        return (
+            <TouchableOpacity
+                onPress={() => {
+                    navigation.navigate("ChatScreen", {
+                        chatId: Number(item.friendId),
+                        name: item.friendName,
+                        isOnline: item.isOnline ? "true" : "false",
+                        avatar: item.profileImage && item.profileImage.trim() !== ''
+                            ? item.profileImage
+                            : process.env.EXPO_PUBLIC_DEFAULT_PROFILE_IMAGE,
+                    });
+                }}
+                className="flex-row items-center px-4 py-3 bg-white border-b dark:bg-slate-900 border-sky-100 dark:border-slate-800"
+            >
+                {/* Avatar */}
+                <View className="relative mr-3">
+                    <Image
+                        source={{ uri: profileImageUri }}
+                        className="w-16 h-16 rounded-full"
+                    />
+                    {item.isOnline && (
+                        <View className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full dark:border-slate-900" />
+                    )}
                 </View>
-                <View className="flex-row items-center">
-                    {getMessageIcon(item.messageType)}
-                    <Text
-                        className={`flex-1 text-sm ${
-                            item.unreadCount > 0
+
+                {/* Chat Info */}
+                <View className="flex-1 mr-2">
+                    <View className="flex-row items-center justify-between mb-1">
+                        <Text
+                            className="text-lg font-semibold text-sky-900 dark:text-slate-200"
+                            numberOfLines={1}
+                        >
+                            {item.friendName}
+                        </Text>
+                        <View className="flex-row items-center">
+                            <Text className="text-xs text-sky-600 dark:text-slate-500">
+                                {formatChatTime(item.timestamp)}
+                            </Text>
+                            {/* Unread Badge next to timestamp */}
+                            {item.unreadCount > 0 && (
+                                <View className="items-center justify-center w-5 h-5 ml-2 rounded-full bg-sky-500 dark:bg-blue-500">
+                                    <Text className="text-xs font-bold text-white">
+                                        {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                    <View className="flex-row items-center">
+                        {getMessageIcon(item.messageType)}
+                        <Text
+                            className={`flex-1 text-sm ${item.unreadCount > 0
                                 ? 'font-semibold text-sky-700 dark:text-slate-300'
                                 : 'text-sky-600 dark:text-slate-400'
-                        }`}
-                        numberOfLines={1}
-                        style={{ marginLeft: item.messageType !== 'text' ? 6 : 0 }}
-                    >
-                        {item.lastMessage}
-                    </Text>
+                                }`}
+                            numberOfLines={1}
+                            style={{ marginLeft: item.messageType !== 'text' ? 6 : 0 }}
+                        >
+                            {item.lastMessage}
+                        </Text>
+                        {/* Message status */}
+                        {getMessageStatusIcon(item.messageStatus, item.unreadCount)}
+                    </View>
                 </View>
-            </View>
-
-            {/* Unread Badge */}
-            {item.unreadCount > 0 && (
-                <View className="items-center justify-center w-6 h-6 rounded-full bg-sky-500 dark:bg-blue-500">
-                    <Text className="text-xs font-bold text-white">
-                        {item.unreadCount > 9 ? '9+' : item.unreadCount}
-                    </Text>
-                </View>
-            )}
-        </TouchableOpacity>
-    );
+            </TouchableOpacity>
+        );
+    };
 
     const unreadCount = chats.filter(chat => chat.unreadCount > 0).length;
 
@@ -233,14 +235,43 @@ export default function HomeScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                             className="p-2 rounded-full bg-sky-100 dark:bg-slate-800"
-                            onPress={() => {
-                                // Navigate to settings or menu
-                            }}
+                            onPress={() => setShowMenu(!showMenu)}
                         >
                             <Ionicons name="ellipsis-vertical" size={22} color={isDark ? "#3b82f6" : "#0ea5e9"} />
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Dropdown Menu */}
+                {showMenu && (
+                    <View className="absolute z-50 overflow-hidden bg-white rounded-lg shadow-lg right-4 top-16 w-44 dark:bg-slate-800">
+                        <TouchableOpacity
+                            className="flex-row items-center px-4 py-3 border-b border-sky-100 dark:border-slate-700"
+                            onPress={() => {
+                                setShowMenu(false);
+
+                                navigation.navigate("SettingScreen");
+                            }}
+                        >
+                            <Ionicons name="settings-outline" size={20} color={isDark ? "#94a3b8" : "#64748b"} />
+                            <Text className="ml-3 text-base text-sky-900 dark:text-slate-200">
+                                Settings
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className="flex-row items-center px-4 py-3"
+                            onPress={() => {
+                                setShowMenu(false);
+                                handleLogout();
+                            }}
+                        >
+                            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                            <Text className="ml-3 text-base text-red-500">
+                                Logout
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Search Bar */}
                 <View className="flex-row items-center px-4 py-3 rounded-xl bg-sky-50 dark:bg-slate-800">
@@ -263,54 +294,48 @@ export default function HomeScreen() {
                 <View className="flex-row mt-4">
                     <TouchableOpacity
                         onPress={() => setActiveTab('all')}
-                        className={`flex-1 py-2 mr-2 rounded-lg ${
-                            activeTab === 'all'
-                                ? 'bg-sky-500 dark:bg-blue-500'
-                                : 'bg-sky-100 dark:bg-slate-800'
-                        }`}
+                        className={`flex-1 py-2 mr-2 rounded-lg ${activeTab === 'all'
+                            ? 'bg-sky-500 dark:bg-blue-500'
+                            : 'bg-sky-100 dark:bg-slate-800'
+                            }`}
                     >
                         <Text
-                            className={`text-center font-semibold ${
-                                activeTab === 'all'
-                                    ? 'text-white'
-                                    : 'text-sky-700 dark:text-slate-400'
-                            }`}
+                            className={`text-center font-semibold ${activeTab === 'all'
+                                ? 'text-white'
+                                : 'text-sky-700 dark:text-slate-400'
+                                }`}
                         >
                             All Chats
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setActiveTab('unread')}
-                        className={`flex-1 py-2 rounded-lg ${
-                            activeTab === 'unread'
-                                ? 'bg-sky-500 dark:bg-blue-500'
-                                : 'bg-sky-100 dark:bg-slate-800'
-                        }`}
+                        className={`flex-1 py-2 rounded-lg ${activeTab === 'unread'
+                            ? 'bg-sky-500 dark:bg-blue-500'
+                            : 'bg-sky-100 dark:bg-slate-800'
+                            }`}
                     >
                         <View className="flex-row items-center justify-center">
                             <Text
-                                className={`text-center font-semibold ${
-                                    activeTab === 'unread'
-                                        ? 'text-white'
-                                        : 'text-sky-700 dark:text-slate-400'
-                                }`}
+                                className={`text-center font-semibold ${activeTab === 'unread'
+                                    ? 'text-white'
+                                    : 'text-sky-700 dark:text-slate-400'
+                                    }`}
                             >
                                 Unread
                             </Text>
                             {unreadCount > 0 && (
                                 <View
-                                    className={`ml-2 px-2 py-0.5 rounded-full ${
-                                        activeTab === 'unread'
-                                            ? 'bg-white'
-                                            : 'bg-sky-500 dark:bg-blue-500'
-                                    }`}
+                                    className={`ml-2 px-2 py-0.5 rounded-full ${activeTab === 'unread'
+                                        ? 'bg-white'
+                                        : 'bg-sky-500 dark:bg-blue-500'
+                                        }`}
                                 >
                                     <Text
-                                        className={`text-xs font-bold ${
-                                            activeTab === 'unread'
-                                                ? 'text-sky-500 dark:text-blue-500'
-                                                : 'text-white'
-                                        }`}
+                                        className={`text-xs font-bold ${activeTab === 'unread'
+                                            ? 'text-sky-500 dark:text-blue-500'
+                                            : 'text-white'
+                                            }`}
                                     >
                                         {unreadCount}
                                     </Text>
@@ -341,25 +366,33 @@ export default function HomeScreen() {
                         {searchQuery
                             ? 'Try searching with different keywords'
                             : activeTab === 'unread'
-                            ? 'All caught up! You have no unread messages'
-                            : 'Start a conversation by tapping the button below'}
+                                ? 'All caught up! You have no unread messages'
+                                : 'Start a conversation by tapping the button below'}
                     </Text>
                 </View>
             ) : (
                 <FlatList
                     data={filteredChats}
                     renderItem={renderChatItem}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => item.friendId}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 80 }}
+                />
+            )}
+
+            {showMenu && (
+                <TouchableOpacity
+                    className="absolute inset-0 bg-transparent"
+                    activeOpacity={1}
+                    onPress={() => setShowMenu(false)}
                 />
             )}
 
             {/* Floating Action Button */}
             <TouchableOpacity
                 onPress={() => {
-                    // Navigate to new chat screen
-                    // navigation.navigate("NewChatScreen");
+
+                    navigation.navigate("ContactListScreen");
                 }}
                 className="absolute items-center justify-center w-16 h-16 rounded-full shadow-lg bottom-6 right-6 bg-sky-500 dark:bg-blue-500"
                 style={{

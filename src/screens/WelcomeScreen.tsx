@@ -85,7 +85,7 @@ export default function WelcomeScreen() {
 
                     <Animated.View entering={FadeIn.delay(900).duration(600)}>
                         <TouchableOpacity
-                            onPress={() => console.log("Already have an account pressed")}
+                            onPress={() => navigation.replace("SignInScreen")}
                             activeOpacity={0.7}
                             className="mt-4"
                         >

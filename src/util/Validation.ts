@@ -11,11 +11,6 @@ export const validateFirstName = (name: string): string | null => {
         return "First Name must be less than 45 characters!";
     }
 
-    const nameRegex = /^[a-zA-Z\s]+$/;
-    if (!nameRegex.test(name)) {
-        return "First Name should only contain letters!";
-    }
-
     return null;
 };
 
@@ -30,12 +25,6 @@ export const validateLastName = (name: string): string | null => {
 
     if (name.trim().length > 45) {
         return "Last Name must be less than 45 characters!";
-    }
-
-    
-    const nameRegex = /^[a-zA-Z\s]+$/;
-    if (!nameRegex.test(name)) {
-        return "Last Name should only contain letters!";
     }
 
     return null;

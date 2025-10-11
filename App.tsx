@@ -14,10 +14,18 @@ import MobileScreen from "./src/screens/MobileScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import ChatScreen from "./src/screens/ChatScreen";
 import ContactListScreen from "./src/screens/ContactListScreen";
+import HomeTabs from "./HomeTabs";
+import AddContactScreen from "./src/screens/AddContactScreen";
+import MyProfileScreen from "./src/screens/MyProfileScreen";
+import SettingScreen from "./src/screens/SettingScreen";
+import SignInScreen from "./src/screens/SignInScreen";
+import StatusScreen from "./src/screens/StatusScreen";
+import AddStatusScreen from "./src/screens/AddStatusScreen";
 
 export type RootStackParamList = {
   SplashScreen: undefined;
   WelcomeScreen: undefined;
+  SignInScreen: undefined;
   SignUpScreen: undefined;
   AvatarScreen: undefined;
   MobileScreen: undefined;
@@ -29,6 +37,13 @@ export type RootStackParamList = {
     avatar: string,
   };
   ContactListScreen: undefined;
+  AddContactScreen: undefined;
+  MyProfileScreen: undefined;
+  SettingScreen: undefined;
+  StatusScreen: undefined;
+  AddStatusScreen: {
+    avatar: string,
+  };
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,15 +57,21 @@ function MainApp() {
         <UserRegistrationProvider>
           <AlertNotificationRoot>
             <NavigationContainer>
-              <Stack.Navigator initialRouteName="ContactListScreen">
+              <Stack.Navigator initialRouteName="SplashScreen">
                 <Stack.Screen name="SplashScreen" component={SplashScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="SignUpScreen" component={SignUpScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="SignInScreen" component={SignInScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="AvatarScreen" component={AvatarScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="MobileScreen" component={MobileScreen} options={{ headerShown: false }} />
-                <Stack.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="HomeScreen" component={HomeTabs} options={{ headerShown: false }} />
                 <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="ContactListScreen" component={ContactListScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="AddContactScreen" component={AddContactScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="MyProfileScreen" component={MyProfileScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="SettingScreen" component={SettingScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="StatusScreen" component={StatusScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="AddStatusScreen" component={AddStatusScreen} options={{ headerShown: false }} />
               </Stack.Navigator>
             </NavigationContainer>
           </AlertNotificationRoot>

@@ -22,7 +22,7 @@ export default function SignUpScreen() {
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "android" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "android" ? 100 : 100}
+            keyboardVerticalOffset={Platform.OS === "android" ? 100 : 0}
             className="items-center flex-1 bg-blue-100 dark:bg-slate-900"
         >
             <SafeAreaView className="items-center justify-center p-5">

@@ -1,12 +1,15 @@
-import { View, Text, TouchableOpacity, FlatList, Image, StatusBar, TextInput, SectionList, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, SectionList, Image, StatusBar, TextInput, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
 import "../../global.css";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../App";
 import { useNavigation } from "@react-navigation/native";
 import { useState, useEffect } from "react";
+import { useUserFriendList } from "../hook/UseUserFriendList";
+import { UserDTo } from "../interface/LetsTalkChats";
+import { formatLastSeen } from "../util/DateFormatter";
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'ContactListScreen'>;
 
@@ -25,94 +28,12 @@ interface ContactSection {
     data: Contact[];
 }
 
-// Mock contacts data
-const MOCK_CONTACTS: Contact[] = [
-    {
-        id: '1',
-        name: 'Amila Jayasinghe',
-        phoneNumber: '+94712345678',
-        avatar: 'https://i.pravatar.cc/150?img=1',
-        isOnline: true,
-        about: 'Hey there! I am using this app.',
-    },
-    {
-        id: '2',
-        name: 'Buddhika Silva',
-        phoneNumber: '+94723456789',
-        avatar: 'https://i.pravatar.cc/150?img=3',
-        isOnline: false,
-        about: 'Busy',
-        lastSeen: '2 hours ago',
-    },
-    {
-        id: '3',
-        name: 'Chamari Fernando',
-        phoneNumber: '+94734567890',
-        avatar: 'https://i.pravatar.cc/150?img=5',
-        isOnline: true,
-        about: 'Available',
-    },
-    {
-        id: '4',
-        name: 'Dilshan Perera',
-        phoneNumber: '+94745678901',
-        avatar: 'https://i.pravatar.cc/150?img=7',
-        isOnline: false,
-        lastSeen: 'yesterday',
-    },
-    {
-        id: '5',
-        name: 'Kasun Rajapaksha',
-        phoneNumber: '+94756789012',
-        avatar: 'https://i.pravatar.cc/150?img=8',
-        isOnline: true,
-        about: 'At work',
-    },
-    {
-        id: '6',
-        name: 'Nimali Wijesinghe',
-        phoneNumber: '+94767890123',
-        avatar: 'https://i.pravatar.cc/150?img=9',
-        isOnline: false,
-        lastSeen: '5 minutes ago',
-    },
-    {
-        id: '7',
-        name: 'Prasad Gunasekara',
-        phoneNumber: '+94778901234',
-        avatar: 'https://i.pravatar.cc/150?img=12',
-        isOnline: true,
-    },
-    {
-        id: '8',
-        name: 'Rashmi Kumari',
-        phoneNumber: '+94789012345',
-        avatar: 'https://i.pravatar.cc/150?img=16',
-        isOnline: false,
-        lastSeen: '3 days ago',
-    },
-    {
-        id: '9',
-        name: 'Sandun Weerasinghe',
-        phoneNumber: '+94790123456',
-        avatar: 'https://i.pravatar.cc/150?img=20',
-        isOnline: true,
-    },
-    {
-        id: '10',
-        name: 'Tharushi Mendis',
-        phoneNumber: '+94701234567',
-        avatar: 'https://i.pravatar.cc/150?img=24',
-        isOnline: false,
-        lastSeen: '1 hour ago',
-    },
-];
-
 export default function ContactListScreen() {
     const { applied } = useTheme();
     const navigation = useNavigation<NavigationProps>();
     const isDark = applied === "dark";
 
+    const users = useUserFriendList();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [filteredContacts, setFilteredContacts] = useState<ContactSection[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -121,22 +42,33 @@ export default function ContactListScreen() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
 
     useEffect(() => {
-        // Simulate API call
-        setTimeout(() => {
-            setContacts(MOCK_CONTACTS);
-            organizeContacts(MOCK_CONTACTS, '');
+        if (users && users.length > 0) {
+            const mappedContacts: Contact[] = users.map((user: UserDTo) => ({
+                id: user.id.toString(),
+                name: user.displayName,
+                phoneNumber: `${user.countryCode}${user.contactNo}`,
+                avatar: user.profileImage || process.env.EXPO_PUBLIC_DEFAULT_PROFILE_IMAGE,
+                isOnline: user.isOnline === 'true',
+                about: user.aboutMe || undefined,
+                lastSeen: user.updatedAt,
+            }));
+            setContacts(mappedContacts);
+            organizeContacts(mappedContacts, searchQuery);
             setIsLoading(false);
-        }, 1000);
-    }, []);
+        } else if (users.length === 0) {
+            setContacts([]);
+            setFilteredContacts([]);
+            setIsLoading(false);
+        }
+    }, [users,navigation]);
 
     useEffect(() => {
         organizeContacts(contacts, searchQuery);
-    }, [searchQuery, contacts]);
+    }, [searchQuery]);
 
     const organizeContacts = (contactList: Contact[], query: string) => {
         let filtered = contactList;
 
-        // Filter by search query
         if (query.trim()) {
             filtered = filtered.filter(contact =>
                 contact.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -144,10 +76,8 @@ export default function ContactListScreen() {
             );
         }
 
-        // Sort alphabetically
         filtered.sort((a, b) => a.name.localeCompare(b.name));
 
-        // Group by first letter
         const grouped: { [key: string]: Contact[] } = {};
         filtered.forEach(contact => {
             const firstLetter = contact.name[0].toUpperCase();
@@ -157,7 +87,6 @@ export default function ContactListScreen() {
             grouped[firstLetter].push(contact);
         });
 
-        // Convert to section list format
         const sections: ContactSection[] = Object.keys(grouped)
             .sort()
             .map(letter => ({
@@ -180,13 +109,14 @@ export default function ContactListScreen() {
         if (isSelectionMode) {
             toggleContactSelection(contact.id);
         } else {
-            // Navigate to chat screen
-            // navigation.navigate("ChatScreen", {
-            //     chatId: contact.id,
-            //     name: contact.name,
-            //     avatar: contact.avatar,
-            //     isOnline: contact.isOnline,
-            // });
+            
+            navigation.navigate("ChatScreen", {
+                chatId: Number(contact.id),
+                name: contact.name,
+                isOnline: contact.isOnline ? "true" : "false",
+                avatar: contact.avatar,
+            });
+            console.log('Start chat with:', contact.name, 'ID:', contact.id);
         }
     };
 
@@ -195,13 +125,16 @@ export default function ContactListScreen() {
             alert('Select at least 2 contacts to create a group');
             return;
         }
-        // Navigate to create group screen
-        // navigation.navigate("CreateGroupScreen", { selectedContacts });
-        console.log('Create group with:', selectedContacts);
+        // Navigate to create group screen with selected contact IDs
+        // navigation.navigate("CreateGroupScreen", { selectedContactIds: selectedContacts });
+        console.log('Create group with contact IDs:', selectedContacts);
+        setIsSelectionMode(false);
+        setSelectedContacts([]);
     };
 
     const renderContact = ({ item }: { item: Contact }) => {
         const isSelected = selectedContacts.includes(item.id);
+        const lastSeenText = formatLastSeen(item.lastSeen);
 
         return (
             <TouchableOpacity
@@ -254,7 +187,10 @@ export default function ContactListScreen() {
                         className="text-sm text-sky-600 dark:text-slate-400"
                         numberOfLines={1}
                     >
-                        {item.about || item.lastSeen ? (item.about || `Last seen ${item.lastSeen}`) : item.phoneNumber}
+                        {item.isOnline 
+                            ? (item.about || 'Online') 
+                            : (lastSeenText ? `Last seen ${lastSeenText}` : (item.about || 'Offline'))
+                        }
                     </Text>
                 </View>
 
@@ -307,7 +243,7 @@ export default function ContactListScreen() {
                                         Contacts
                                     </Text>
                                     <Text className="text-sm text-sky-600 dark:text-slate-400">
-                                        {contacts.length} contacts • {onlineCount} online
+                                        {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} • {onlineCount} online
                                     </Text>
                                 </View>
                             </>
@@ -332,7 +268,12 @@ export default function ContactListScreen() {
                     {/* Action Buttons */}
                     {!isSelectionMode ? (
                         <View className="flex-row items-center">
-                            <TouchableOpacity className="p-2 mr-2 rounded-full bg-sky-100 dark:bg-slate-800">
+                            <TouchableOpacity 
+                                className="p-2 mr-2 rounded-full bg-sky-100 dark:bg-slate-800"
+                                onPress={() => {
+                                   navigation.navigate("AddContactScreen");
+                                }}
+                            >
                                 <Ionicons name="person-add" size={22} color={isDark ? "#3b82f6" : "#0ea5e9"} />
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -354,7 +295,9 @@ export default function ContactListScreen() {
                                     : 'bg-sky-200 dark:bg-slate-700'
                             }`}
                         >
-                            <Text className="font-semibold text-white">
+                            <Text className={`font-semibold ${
+                                selectedContacts.length >= 2 ? 'text-white' : 'text-sky-400 dark:text-slate-500'
+                            }`}>
                                 Create Group
                             </Text>
                         </TouchableOpacity>
@@ -380,12 +323,12 @@ export default function ContactListScreen() {
             </View>
 
             {/* Quick Actions */}
-            {!isSelectionMode && (
+            {!isSelectionMode && contacts.length > 0 && (
                 <View className="bg-white dark:bg-slate-900">
                     <TouchableOpacity
                         className="flex-row items-center px-4 py-3 border-b border-sky-100 dark:border-slate-800"
                         onPress={() => {
-                            // Navigate to create group
+                            setIsSelectionMode(true);
                         }}
                     >
                         <View className="items-center justify-center w-12 h-12 mr-3 rounded-full bg-sky-500 dark:bg-blue-500">
@@ -399,7 +342,7 @@ export default function ContactListScreen() {
                     <TouchableOpacity
                         className="flex-row items-center px-4 py-3 border-b border-sky-100 dark:border-slate-800"
                         onPress={() => {
-                            // Navigate to add contact
+                            navigation.navigate("AddContactScreen");
                         }}
                     >
                         <View className="items-center justify-center w-12 h-12 mr-3 bg-green-500 rounded-full">
@@ -431,8 +374,20 @@ export default function ContactListScreen() {
                     <Text className="text-center text-sky-600 dark:text-slate-400">
                         {searchQuery
                             ? 'Try searching with different keywords'
-                            : 'Add contacts to start chatting'}
+                            : 'Add contacts to start chatting with friends'}
                     </Text>
+                    {!searchQuery && (
+                        <TouchableOpacity
+                            className="px-6 py-3 mt-6 rounded-full bg-sky-500 dark:bg-blue-500"
+                            onPress={() => {
+                                navigation.navigate("AddContactScreen");
+                            }}
+                        >
+                            <Text className="font-semibold text-white">
+                                Add Contact
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             ) : (
                 <SectionList

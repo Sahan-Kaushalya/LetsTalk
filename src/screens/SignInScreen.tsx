@@ -1,7 +1,6 @@
 import { KeyboardAvoidingView, Platform, StatusBar, Text, TouchableOpacity, View, TextInput, Modal, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
-import { useUserRegistration } from "../components/UserContext";
 import "../../global.css";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -11,13 +10,12 @@ import { ALERT_TYPE, Toast } from "react-native-alert-notification";
 import { useState, useRef, useContext } from "react";
 import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import { validatePhoneByCountry, validateCountryCode } from "../util/Validation";
-import { verifyMobile } from "../api/VerificationService";
-import { createNewAccount } from "../api/UserService";
 import { AuthContext } from "../components/AuthProvider";
+import { verifyUserMobile } from "../api/UserLoginService";
 
-type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'MobileScreen'>;
+type NavigationProps = NativeStackNavigationProp<RootStackParamList, 'SignInScreen'>;
 
-export default function MobileScreen() {
+export default function SignInScreen() {
     const [countryCode, setCountryCode] = useState<CountryCode>('LK');
     const [country, setCountry] = useState<Country | null>(null);
     const [callingCode, setCallingCode] = useState('94');
@@ -26,14 +24,14 @@ export default function MobileScreen() {
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
     const [isLoading, setIsLoading] = useState(false);
-    const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+    const [isSigningIn, setIsSigningIn] = useState(false);
+    const [serverVCode, setServerVCode] = useState('');
+    const [userId, setUserId] = useState('');
 
     const { applied } = useTheme();
-    const { userData, setUserData } = useUserRegistration();
     const navigation = useNavigation<NavigationProps>();
     const isDark = applied === "dark";
     const auth = useContext(AuthContext);
-
 
     const otpRefs = [
         useRef<TextInput>(null),
@@ -85,18 +83,12 @@ export default function MobileScreen() {
         setIsLoading(true);
 
         try {
-            const response = await verifyMobile(phoneNumber, callingCode);
+
+            const response = await verifyUserMobile(phoneNumber, callingCode);
 
             if (response.status) {
-                const vCode = response.vcode;
-
-               
-                setUserData(prev => ({
-                    ...prev,
-                    contactNo: phoneNumber,
-                    countryCode: callingCode,
-                    vCode: vCode
-                }));
+                setServerVCode(response.vcode);
+                setUserId(response.userId);
 
                 setShowVerificationModal(true);
 
@@ -165,42 +157,45 @@ export default function MobileScreen() {
             return;
         }
 
-        if (enteredCode === userData.vCode) {
+        if (enteredCode === serverVCode) {
             setShowVerificationModal(false);
-            setIsCreatingAccount(true);
+            setIsSigningIn(true);
 
             try {
-                const respone = await createNewAccount(userData);
-                if (respone.status) {
-                    console.log(respone.userId);
-                    const id = (respone.userId);
-                    console.log(id);
+        
+                const response = {
+                    status: true,
+                    userId: userId,
+                    message: 'Sign in successful'
+                };
+
+                if (response.status) {
+                    const userId = response.userId;
+                    
                     if (auth) {
-                        console.log("Okay");
-                        console.log(id);
-                        await auth.signUp(String(id));
+                        await auth.signUp(String(userId));
                     }
-                    navigation.navigate("HomeScreen");
+                    
+                    navigation.replace("HomeScreen");
                 } else {
                     Toast.show({
                         type: ALERT_TYPE.WARNING,
                         title: "WARNING",
-                        textBody: respone.message,
+                        textBody: response.message,
                         autoClose: 2000,
                         textBodyStyle: { fontSize: 15 },
                     });
-
                 }
             } catch (error) {
                 Toast.show({
                     type: ALERT_TYPE.DANGER,
                     title: "Error",
-                    textBody: "Failed to create account. Please try again.",
+                    textBody: "Failed to sign in. Please try again.",
                     autoClose: 3000,
                     textBodyStyle: { fontSize: 15 },
                 });
             } finally {
-                setIsCreatingAccount(false);
+                setIsSigningIn(false);
             }
         } else {
             Toast.show({
@@ -229,7 +224,7 @@ export default function MobileScreen() {
     };
 
     const getPlaceholder = () => {
-        if (callingCode === '94') return '0712345678';
+        if (callingCode === '94') return '712345678';
         if (callingCode === '1') return '2025551234';
         if (callingCode === '44') return '7911123456';
         return '1234567890';
@@ -262,13 +257,13 @@ export default function MobileScreen() {
 
                 <View className="items-center mt-8">
                     <View className="items-center justify-center w-24 h-24 rounded-full bg-sky-200 dark:bg-slate-800">
-                        <Ionicons name="phone-portrait" size={48} color={isDark ? "#3b82f6" : "#0ea5e9"} />
+                        <Ionicons name="log-in" size={48} color={isDark ? "#3b82f6" : "#0ea5e9"} />
                     </View>
                     <Text className="mt-6 text-3xl font-bold text-center text-sky-900 dark:text-slate-200">
-                        Verify Phone Number
+                        Welcome Back
                     </Text>
                     <Text className="mt-3 text-base text-center text-sky-600 dark:text-slate-400">
-                        We'll send you a verification code
+                        Sign in with your phone number
                     </Text>
                 </View>
 
@@ -354,11 +349,11 @@ export default function MobileScreen() {
 
                 <View className="flex-row justify-center mt-6">
                     <Text className="text-sm text-sky-800 dark:text-slate-400">
-                        Already have an account?{' '}
+                        Don't have an account?{' '}
                     </Text>
                     <TouchableOpacity onPress={() => navigation.replace("WelcomeScreen")}>
                         <Text className="text-sm font-semibold text-sky-600 dark:text-sky-400">
-                            Back to Login
+                            Sign Up
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -418,7 +413,7 @@ export default function MobileScreen() {
                                 <ActivityIndicator color="white" />
                             ) : (
                                 <Text className="text-lg font-bold text-center text-white">
-                                    Verify Code
+                                    Verify & Sign In
                                 </Text>
                             )}
                         </TouchableOpacity>
@@ -438,7 +433,7 @@ export default function MobileScreen() {
             </Modal>
 
             <Modal
-                visible={isCreatingAccount}
+                visible={isSigningIn}
                 animationType="fade"
                 transparent={true}
             >
@@ -449,7 +444,7 @@ export default function MobileScreen() {
                         </View>
                         <ActivityIndicator size="large" color={isDark ? "#3b82f6" : "#0ea5e9"} />
                         <Text className="mt-4 text-lg font-semibold text-sky-900 dark:text-slate-200">
-                            Creating Your Account
+                            Signing You In
                         </Text>
                         <Text className="mt-2 text-sm text-center text-sky-600 dark:text-slate-400">
                             Please wait a moment...
